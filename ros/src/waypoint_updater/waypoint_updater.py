@@ -24,7 +24,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
 MAX_DECEL = 1.25
 
 
@@ -55,7 +55,7 @@ class WaypointUpdater(object):
             if self.pose and self.base_waypoints:
                 # get closest waypoint
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
-                self.publish_waypoints(closest_waypoint_idx)
+                self.publish_waypoints()
             rate.sleep()
     
     def get_closest_waypoint_idx(self):
@@ -78,7 +78,7 @@ class WaypointUpdater(object):
             closest_idx = (closest_idx + 1) %len(self.waypoints_2d)
         return closest_idx
 
-    def publish_waypoints(self, closest_idx):
+    def publish_waypoints(self):
         final_lane = self.generate_lane()
         self.final_waypoints_pub.publish(final_lane)
 
@@ -92,6 +92,7 @@ class WaypointUpdater(object):
         if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
             lane.waypoints = base_waypoints
         else:
+            # slow down the vehicle when encounter the red light until stop
             lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
         
         return lane
@@ -102,11 +103,12 @@ class WaypointUpdater(object):
             p = Waypoint()
             p.pose = wp.pose
 
-            # two waypoints back from line so front part of car stops at line 
-            stop_idx = max(self.stopline_wp_idx - closest_idx -2, 0)
+            # two waypoints back from line so front part of car stops at stopline 
+            stop_idx = max(self.stopline_wp_idx - closest_idx -4, 0)
             dist = self.distance(waypoints, i, stop_idx)
+            # change the velocity according the distance to the red light
             vel = math.sqrt(2 * MAX_DECEL * dist)
-            if vel > 1.:
+            if vel < 1.:
                 vel = 0
             p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
             temp.append(p)
